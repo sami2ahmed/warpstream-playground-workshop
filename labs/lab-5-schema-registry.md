@@ -91,8 +91,8 @@ Business requirements change. We need to add an `email` field to our User.
 Schema Registry enforces rules to ensure changes don't break consumers.
 
 ```bash
-# Get current mode (Default is usually BACKWARD)
-curl -s http://localhost:9094/config/users-value
+# Get current compatibility config (Default is usually BACKWARD)
+curl -s http://localhost:9094/config | jq .
 ```
 
 **Set to BACKWARD:**
@@ -126,12 +126,9 @@ curl -X POST http://localhost:9094/subjects/users-value/versions \
   -d '{"schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"age\",\"type\":\"string\"}]}"}'
 ```
 
-*Expected error (409 Conflict):*
+*Expected error (40901 Conflict):*
 ```json
-{
-  "error_code": 409,
-  "message": "schema being registered is incompatible with an earlier schema for subject 'users-value', details: [{errorType:TYPE_MISMATCH, description:reader schema string not compatible with writer schema int}]"
-}
+{"error_code":40901,"message":"schema being registered is incompatible with an earlier schema for subject 'users-value', details: [{errorType:TYPE_MISMATCH, description:reader schema string not compatible with writer schema int}]"}
 ```
 
 **Check compatibility before registering:**
