@@ -61,7 +61,7 @@ We will simulate a second group of agents running on a different port (`9096`).
         -agentKey <YOUR_AGENT_KEY> \
         -defaultVirtualClusterID <YOUR_VCI> \
         -bucketURL "file:///tmp/warpstream-data" \
-        -region us-east1 \
+        -metadataURL "https://prod-q.us-east1.gcp.warpstream.com" \
         -kafkaPort 9096 \
         -httpPort 8085 \
         -agentGroup group-1
@@ -70,6 +70,11 @@ We will simulate a second group of agents running on a different port (`9096`).
     *   `-agentGroup group-1`: Assigns this agent to a specific group.
     *   `-kafkaPort 9096`: Listens on a different port to avoid conflict.
     *   `-bucketURL ...`: Points to the SAME data location as the playground.
+    *   `-metadataURL ...`: Points the agent at the GCP control plane used by the playground. Using `-region` alone can fail against this environment.
+
+    Keep this agent running in its own terminal. Open a second terminal for the `kcat` commands below.
+
+    On macOS, you may see a system dialog asking whether to allow `warpstream` to accept incoming network connections. Approve it so clients can reach port `9096`.
 
 ## Step 3: Verify Connectivity
 
