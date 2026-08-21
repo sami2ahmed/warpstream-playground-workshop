@@ -10,4 +10,5 @@ services:
       - ./duckdb-data:/data
       - /tmp/warpstream-tableflow-iceberg:/tableflow
       - ../scripts:/data/scripts
+      - /tmp/warpstream-tableflow-iceberg:/tmp/warpstream-tableflow-iceberg
     command: tail -f /dev/null
