@@ -53,7 +53,7 @@ mkdir -p /tmp/warpstream-tableflow-iceberg
 We need a query engine that understands Iceberg.
 
 ```bash
-docker-compose -f docker/docker-compose-lab6.yml up -d duckdb
+docker compose -f docker/docker-compose-lab6.yml up -d duckdb
 ```
 
 ## Step 3: Produce Data
@@ -85,12 +85,21 @@ tables:
   - source_cluster_name: "playground_kafka"
     source_topic: "ecommerce-orders"
     source_format: "json"
+    schema_mode: "inline"
     destination_bucket_url: "file:///tmp/warpstream-tableflow-iceberg"
-    schema:
-      fields:
-        - {name: order_id, id: 1, type: string}
-        - {name: total_amount, id: 4, type: double}
-        - {name: status, id: 5, type: string}
+    input_schema: |
+      {
+        "type": "object",
+        "properties": {
+          "order_id": {"type": "string"},
+          "customer_id": {"type": "string"},
+          "timestamp": {"type": "string", "format": "date-time"},
+          "total_amount": {"type": "number"},
+          "status": {"type": "string"},
+          "payment_method": {"type": "string"}
+        },
+        "required": ["order_id", "total_amount", "status"]
+      }
 ```
 
 ## Step 2: Apply Configuration
