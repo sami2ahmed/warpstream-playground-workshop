@@ -77,16 +77,12 @@ Copy and paste this YAML into the pipeline editor:
 input:
   kafka_franz_warpstream:
     topics: ["raw-events"]
-    consumer_group: "transform-pipeline"
+    consumer_group: "transform-pipeline-v3"
 
 pipeline:
   processors:
-    # Step 1: Parse JSON input
     - mapping: |
-        root = this.parse_json()
-
-    # Step 2: Add new computed fields
-    - mapping: |
+        root = this
         root.processed_at = now()
         root.event_date = now().ts_format("2006-01-02")
         root.event_hour = now().ts_format("15")
@@ -98,15 +94,9 @@ pipeline:
         } else {
           "low"
         }
-
-    # Step 3: Rename fields
-    - mapping: |
         root.customer_id = this.user_id
         root.transaction_amount = this.amount
-
-    # Step 4: Drop sensitive fields
-    - mapping: |
-        root = this.without("user_id", "amount", "internal_id", "ssn", "credit_card")
+        root = root.without("user_id", "amount", "internal_id", "ssn", "credit_card")
 
 output:
   kafka_franz_warpstream:
@@ -158,25 +148,32 @@ Copy and paste this YAML:
 input:
   kafka_franz_warpstream:
     topics: ["transformed-events"]
-    consumer_group: "file-sink-pipeline"
+    consumer_group: "file-sink-pipeline-v3"
 
 pipeline:
   processors:
+    # Skip bootstrap / bad messages that lack partition fields
     - mapping: |
-        root = this.parse_json()
-        meta partition_path = "year=" + this.event_date.split("-").index(0) +
-                             "/month=" + this.event_date.split("-").index(1) +
-                             "/day=" + this.event_date.split("-").index(2) +
-                             "/hour=" + this.event_hour
+        root = if this.event_date.or("") == "" {
+          deleted()
+        } else {
+          this
+        }
+    - mapping: |
+        root = this
+        meta partition_path = "year=" + this.event_date.string().split("-").index(0) +
+                             "/month=" + this.event_date.string().split("-").index(1) +
+                             "/day=" + this.event_date.string().split("-").index(2) +
+                             "/hour=" + this.event_hour.string()
 
 buffer:
   memory:
     limit: 52428800
     batch_policy:
       enabled: true
-      count: 100
+      count: 10
       byte_size: 1048576
-      period: "30s"
+      period: "10s"
 
 output:
   file:
@@ -201,9 +198,17 @@ warpstream:
 1. Click **Save**
 2. Toggle **Paused** to enable
 
-### Step 5: Verify File Output
+### Step 5: Spot-check transform output, then verify files
 
-After pipeline processes messages, check the output:
+After both pipelines are enabled, produce a few sample events (Part 5 below), then confirm the transform pipeline wrote enriched records to `transformed-events`:
+
+```bash
+kcat -b localhost:9092 -t transformed-events -C -o -5 -e
+```
+
+`-o -5` reads the last 5 messages so you are looking at fresh output, not the earlier `{"init": true}` bootstrap. You should see fields like `priority`, `event_date`, and `customer_id`. Sensitive fields such as `ssn` / `credit_card` / `user_id` should be gone.
+
+Then check that the file sink wrote partitioned JSON under `./output/events`:
 
 ```bash
 # List generated files
@@ -253,19 +258,20 @@ curl https://api.warpstream.com/api/v1/create_pipeline_configuration \
   -d '{
     "virtual_cluster_id": "vci_xxx",
     "pipeline_id": "pipeline-xyz",
-    "configuration_yaml": "input:\n  kafka_franz_warpstream:\n    topics: [\"raw-events\"]\n..."
+    "configuration_yaml": "input:\n  kafka_franz_warpstream:\n    topics: [\"raw-events\"]\n    consumer_group: \"transform-pipeline-v3\"\n\npipeline:\n  processors:\n    - mapping: |\n        root = this\n        root.processed_at = now()\n        root.event_date = now().ts_format(\"2006-01-02\")\n        root.event_hour = now().ts_format(\"15\")\n        root.is_high_value = this.amount.or(0) > 100\n        root.priority = if this.amount.or(0) > 500 {\n          \"high\"\n        } else if this.amount.or(0) > 100 {\n          \"medium\"\n        } else {\n          \"low\"\n        }\n        root.customer_id = this.user_id\n        root.transaction_amount = this.amount\n        root = root.without(\"user_id\", \"amount\", \"internal_id\", \"ssn\", \"credit_card\")\n\noutput:\n  kafka_franz_warpstream:\n    topic: \"transformed-events\"\n    key: \"${! json(\\\"customer_id\\\") }\"\n\nwarpstream:\n  cluster_concurrency_target: 1"
   }'
 ```
 
 ### Step 3: Enable Pipeline
 
 ```bash
-curl https://api.warpstream.com/api/v1/unpause_pipeline \
+curl https://api.warpstream.com/api/v1/change_pipeline_state \
   -H 'warpstream-api-key: YOUR_API_KEY' \
   -H 'Content-Type: application/json' \
   -d '{
     "virtual_cluster_id": "vci_xxx",
-    "pipeline_id": "pipeline-xyz"
+    "pipeline_id": "pipeline-xyz",
+    "desired_state": "running"
   }'
 ```
 
@@ -297,7 +303,17 @@ done | kcat -b localhost:9092 -t raw-events -P
 ### Consume Transformed Events
 
 ```bash
-kcat -b localhost:9092 -t transformed-events -C -o beginning -c 10 | jq .
+kcat -b localhost:9092 -t transformed-events -C -o -20 -c 20 | jq .
+```
+
+This pulls the newest ~20 messages so you are inspecting recent transforms rather than bootstrap/`init` records from the start of the topic.
+
+### Inspect Raw Events
+
+You can also peek at the input topic directly:
+
+```bash
+kcat -b localhost:9092 -t raw-events -C -o -10 -c 10 | jq .
 ```
 
 ---
