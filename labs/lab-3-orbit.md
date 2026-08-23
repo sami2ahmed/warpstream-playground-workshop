@@ -35,12 +35,28 @@ This is critical for migrations:
 
 Since we don't have a production Kafka cluster handy, we will spin up a separate local Kafka container to act as the "Legacy Source".
 
+## Prerequisites: Docker
+
+Lab 3 needs Docker Desktop running before you start the source Kafka cluster.
+
+**macOS install (if Docker is missing):**
+```bash
+brew install --cask docker
+```
+
+Then open **Docker** from Applications and wait until it says it is running.
+
+**Quick check:**
+```bash
+docker info >/dev/null && echo "Docker is ready"
+```
+
 ## Step 1: Start Source Kafka Cluster
 
 We need a second Kafka cluster running on a different port (9093).
 
 ```bash
-docker-compose -f docker/docker-compose-lab3.yml up -d
+docker compose -f docker/docker-compose-lab3.yml up -d
 ```
 
 **Verify connectivity to the "Legacy" cluster:**
@@ -76,12 +92,22 @@ Let's generate some traffic on the source cluster.
 
 Follow the [orbit documentation](https://docs.warpstream.com/warpstream/kafka/orbit)
 
+### Spot-check replication on WarpStream
+
+The Console UI can lag briefly if you move quickly. As a fallback, confirm the `orders` and `payments` topics showed up on the WarpStream broker:
+
+```bash
+kcat -b localhost:9092 -L | grep -E 'orders|payments'
+```
+
+You should see both topic names listed. If they are missing, wait a few seconds and run the command again.
+
 ## Step 5: Cleanup
 
 Stop the "Legacy" source cluster to save resources.
 
 ```bash
-docker-compose -f docker/docker-compose-lab3.yml down
+docker compose -f docker/docker-compose-lab3.yml down
 ```
 
 ## Next Steps
