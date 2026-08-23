@@ -66,7 +66,6 @@ echo -e "message 1\nmessage 2\nmessage 3" | kcat -b localhost:9092 -t messages -
 ```
 
 ### JSON Messages
-Structured data is standard in production.
 ```bash
 echo '{"user": "alice", "action": "login"}' | kcat -b localhost:9092 -t events -P
 echo '{"user": "bob", "action": "purchase", "amount": 99.99}' | kcat -b localhost:9092 -t events -P
@@ -101,18 +100,18 @@ kcat -b localhost:9092 -t keyed -C -o beginning -e -f 'Partition: %p | Offset: %
 
 When you specify a group ID (`-G`), the broker manages offsets for you, ensuring each message is processed only once per group.
 
-1.  **Produce 10 messages:**
+1.  **Start a Consumer Group** (leave it running):
+    ```bash
+    kcat -b localhost:9092 -G my-group orders
+    ```
+
+2.  **Produce 10 messages** in a second terminal:
     ```bash
     for i in {1..10}; do
       echo "order-$i" | kcat -b localhost:9092 -t orders -P
     done
     ```
-
-2.  **Start a Consumer Group:**
-    ```bash
-    kcat -b localhost:9092 -G my-group orders
-    ```
-    *You should see all 10 messages. Press `Ctrl+C` to stop.*
+    *Watch the consumer terminal. You should see each message land as it is produced. Press `Ctrl+C` in the consumer terminal to stop.*
 
 3.  **Verify Offset Tracking:**
     Produce 5 more messages:
@@ -144,16 +143,16 @@ Sending one message at a time is slow. Sending a bucket of 1,000 messages is fas
 ### Performance Comparison
 
 **Scenario A: Default (Slow)**
-Sending messages one-by-one (simulates `linger.ms=0`).
+Sending messages one-by-one (simulates `linger.ms=0`). We only send 10 messages here so the demo finishes quickly.
 ```bash
 echo "Sending messages one-by-one..."
-time for i in {1..100}; do
+time for i in {1..10}; do
   echo "message-$i" | kcat -b localhost:9092 -t perf-demo -P
 done
 ```
 
 **Scenario B: Optimized (Fast)**
-Sending messages in a stream allows the client to batch them efficiently.
+Sending messages in a stream allows the client to batch them efficiently. This run uses 1–100 messages (10x Scenario A) so the batching win is easier to see even with more work.
 ```bash
 echo "Sending messages in batches..."
 time ( for i in {1..100}; do
@@ -164,6 +163,6 @@ done | kcat -b localhost:9092 -t perf-demo -P \
   -X compression.codec=lz4)
 ```
 
-*Result: Scenario B should be significantly faster because `kcat` can batch the input stream.*
+*Result: Scenario B should still finish faster than Scenario A despite sending 100 messages instead of 10, because `kcat` can batch the input stream.*
 
 Proceed to [Lab 2: WarpStream Agent Groups](lab-2-agent-groups.md) to explore advanced deployment topologies.
