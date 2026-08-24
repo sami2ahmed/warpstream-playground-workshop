@@ -3,6 +3,7 @@
 ## Learning Objectives
 
 By the end of this lab, you will:
+
 - Understand how WarpStream Tableflow automates the Streaming-to-Lakehouse path.
 - Configure a Tableflow pipeline to write Apache Iceberg tables.
 - Query streaming data using DuckDB and PyIceberg.
@@ -38,7 +39,11 @@ Analytics                              | (Reads)
 
 ---
 
+
+
 ## Part 1: Environment Setup
+
+
 
 ## Step 1: Create Local Storage
 
@@ -48,6 +53,8 @@ In a real deployment, this would be an S3 bucket. Locally, we use a directory.
 mkdir -p /tmp/warpstream-tableflow-iceberg
 ```
 
+
+
 ## Step 2: Start DuckDB
 
 We need a query engine that understands Iceberg.
@@ -55,6 +62,8 @@ We need a query engine that understands Iceberg.
 ```bash
 docker compose -f docker/docker-compose-lab6.yml up -d duckdb
 ```
+
+
 
 ## Step 3: Produce Data
 
@@ -67,11 +76,19 @@ scripts/produce-sample-orders.sh ecommerce-orders 50
 
 ---
 
+
+
 ## Part 2: Configure Tableflow
+
+
 
 ## Step 1: Create Configuration
 
 Define the mapping from Kafka Topic to Iceberg Table.
+
+Go to the **WarpStream Console** --> **Tableflow** (left hand menu) --> **Create**  
+
+Then simply copy paste the yaml below, save it, and toggle the radio button 
 
 ```yaml
 # /tmp/tableflow-config.yaml
@@ -102,13 +119,19 @@ tables:
       }
 ```
 
+
+
 ## Step 2: Apply Configuration
 
 *For this workshop, the agent automatically picks up the configuration if linked to the correct Virtual Cluster ID.*
 
 ---
 
+
+
 ## Part 3: Verify and Query
+
+
 
 ## Step 1: Inspect Files
 
@@ -130,5 +153,7 @@ docker exec -i lab6-duckdb python3 /data/scripts/query-iceberg-with-pyiceberg.py
 ```
 
 **Expected Output:**
+
 - Total Orders count.
 - Revenue aggregation by status.
+

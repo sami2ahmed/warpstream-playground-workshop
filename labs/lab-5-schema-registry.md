@@ -7,6 +7,7 @@
 ## Learning Objectives
 
 By the end of this lab, you will:
+
 - Understand how Schema Registry prevents "bad data".
 - Register Avro and Protobuf schemas via REST API.
 - Evolve schemas safely using compatibility checks.
@@ -32,17 +33,23 @@ In a decoupled architecture, Producers and Consumers often don't talk to each ot
 
 ---
 
+
+
 ## Part 1: Schema Registry Basics
+
+
 
 ## Step 1: Verify Environment
 
 The WarpStream playground includes a Schema Registry compatible with standard clients.
 
 **Check if it's running:**
+
 ```bash
 curl -s http://localhost:9094/subjects | jq .
 ```
-*Expected output: `[]` (Empty array).*
+
+*Expected output:* `[]` *(Empty array).*
 
 ## Step 2: Register a Schema (Avro)
 
@@ -51,6 +58,7 @@ Convention: `topic-name-value`.
 
 **Subject**: `users-value`
 **Schema**:
+
 ```json
 {
   "type": "record",
@@ -63,24 +71,28 @@ Convention: `topic-name-value`.
 ```
 
 **Register it via API:**
+
 ```bash
 curl -X POST http://localhost:9094/subjects/users-value/versions \
   -H "Content-Type: application/vnd.schemaregistry.v1+json" \
   -d '{"schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"age\",\"type\":\"int\"}]}"}'
 ```
 
-*Expected output: `{"id":1}`*
+*Expected output:* `{"id":1}`
 
 ## Step 3: Retrieve Schema
 
 You can fetch schemas by Subject or globally by ID.
 
 **Get latest version:**
+
 ```bash
 curl -s http://localhost:9094/subjects/users-value/versions/latest | jq .
 ```
 
 ---
+
+
 
 ## Part 2: Schema Evolution
 
@@ -96,6 +108,7 @@ curl -s http://localhost:9094/config | jq .
 ```
 
 **Set to BACKWARD:**
+
 ```bash
 curl -X PUT http://localhost:9094/config/users-value \
   -H "Content-Type: application/vnd.schemaregistry.v1+json" \
@@ -103,6 +116,8 @@ curl -X PUT http://localhost:9094/config/users-value \
 ```
 
 > **BACKWARD Compatibility**: New schema can read old data. (Consumer upgrades first).
+
+
 
 ## Step 2: Evolve Schema (Valid)
 
@@ -114,7 +129,7 @@ curl -X POST http://localhost:9094/subjects/users-value/versions \
   -d '{"schema": "{\"type\":\"record\",\"name\":\"User\",\"fields\":[{\"name\":\"name\",\"type\":\"string\"},{\"name\":\"age\",\"type\":\"int\"},{\"name\":\"email\",\"type\":[\"null\",\"string\"],\"default\":null}]}"}'
 ```
 
-*Expected output: `{"id":2}`*
+*Expected output:* `{"id":2}`
 
 ## Step 3: Attempt Invalid Evolution
 
@@ -127,11 +142,13 @@ curl -X POST http://localhost:9094/subjects/users-value/versions \
 ```
 
 *Expected error (40901 Conflict):*
+
 ```json
 {"error_code":40901,"message":"schema being registered is incompatible with an earlier schema for subject 'users-value', details: [{errorType:TYPE_MISMATCH, description:reader schema string not compatible with writer schema int}]"}
 ```
 
 **Check compatibility before registering:**
+
 ```bash
 curl -s -X POST http://localhost:9094/compatibility/subjects/users-value/versions/latest \
   -H "Content-Type: application/vnd.schemaregistry.v1+json" \
@@ -143,6 +160,8 @@ curl -s -X POST http://localhost:9094/compatibility/subjects/users-value/version
 > **Key Insight**: Schema Registry acts as a gatekeeper, preventing producers from publishing data that would break existing consumers.
 
 ---
+
+
 
 ## Part 3: Using kcat with Schema Registry
 
@@ -159,6 +178,7 @@ echo '{"name": "Charlie", "age": 35}' | kcat -b localhost:9092 -t users-avro -P
 ```
 
 **Produce multiple messages at once:**
+
 ```bash
 cat <<EOF | kcat -b localhost:9092 -t users-avro -P
 {"name": "Diana", "age": 28}
@@ -166,35 +186,44 @@ cat <<EOF | kcat -b localhost:9092 -t users-avro -P
 EOF
 ```
 
+
+
 ### Step 2: Consume Messages with kcat
 
 **Basic consumption:**
+
 ```bash
 kcat -b localhost:9092 -t users-avro -C -e
 ```
 
 **Consume with metadata (JSON output):**
+
 ```bash
 kcat -b localhost:9092 -t users-avro -C -J -e | jq -c '.'
 ```
 
 *Expected output:*
+
 ```json
 {"topic":"users-avro","partition":0,"offset":0,"tstype":"create","ts":1234567890,"key":null,"payload":"{\"name\": \"Alice\", \"age\": 30}"}
 {"topic":"users-avro","partition":0,"offset":1,"tstype":"create","ts":1234567891,"key":null,"payload":"{\"name\": \"Bob\", \"age\": 25}"}
 ```
 
 **Formatted output with partition and offset:**
+
 ```bash
 kcat -b localhost:9092 -t users-avro -C \
   -f 'Partition: %p | Offset: %o | Value: %s\n' -e
 ```
+
+
 
 ### Step 3: Consumer Schema Validation with kcat
 
 The `-s avro -r <url>` flags enable kcat to deserialize Avro-encoded messages using Schema Registry. This acts as a **consumer-side validation** - messages that don't conform to the expected Avro format are rejected.
 
 **Test: Try to consume plain JSON as Avro (will fail):**
+
 ```bash
 # First, produce plain JSON (not Avro-encoded)
 echo '{"name": "TestUser", "age": 30}' | kcat -b localhost:9092 -t schema-test -P
@@ -208,6 +237,7 @@ kcat -b localhost:9092 -t schema-test \
 ```
 
 *Expected error:*
+
 ```
 % ERROR: Failed to format message in schema-test [0] at offset 0: 
 Avro/Schema-registry message deserialization: Invalid CP1 magic byte 123, 
@@ -227,6 +257,8 @@ kcat -b localhost:9092 -t properly-encoded-avro-topic \
 ```
 
 > **Note**: kcat's `-s avro` is **consumer-only**. To produce Avro-encoded messages, use Confluent's `kafka-avro-console-producer` or a programmatic client (Java, Python, Go) with Schema Registry integration.
+
+
 
 ### Step 4: Validate Schema Conformance
 
@@ -251,17 +283,22 @@ kcat -b localhost:9092 -L | grep "topic"
 curl -s http://localhost:9094/subjects | jq .
 ```
 
+
+
 ### kcat Reference for Schema Registry (Consumer Only)
 
-| Option | Description |
-|--------|-------------|
-| `-r <url>` | Schema Registry URL (required with `-s avro`) |
-| `-s value=avro` | Deserialize Avro-encoded message values (consumer only) |
-| `-s key=avro` | Deserialize Avro-encoded message keys (consumer only) |
-| `-J` | Output messages as JSON with metadata |
-| `-f <format>` | Custom output format (`%p`=partition, `%o`=offset, `%s`=payload) |
+
+| Option          | Description                                                      |
+| --------------- | ---------------------------------------------------------------- |
+| `-r <url>`      | Schema Registry URL (required with `-s avro`)                    |
+| `-s value=avro` | Deserialize Avro-encoded message values (consumer only)          |
+| `-s key=avro`   | Deserialize Avro-encoded message keys (consumer only)            |
+| `-J`            | Output messages as JSON with metadata                            |
+| `-f <format>`   | Custom output format (`%p`=partition, `%o`=offset, `%s`=payload) |
+
 
 **Avro Message Format** (what kcat expects when using `-s avro`):
+
 ```
 [0x00][4-byte schema ID][Avro binary payload]
   ^         ^                   ^
@@ -274,12 +311,16 @@ curl -s http://localhost:9094/subjects | jq .
 
 ---
 
+
+
 ## Summary
 
--   **Schema Registry** is the "single source of truth" for data structures.
--   **Evolution** allows schemas to change over time without breaking applications.
--   **Compatibility Modes** (BACKWARD, FORWARD, FULL) dictate the rules for evolution.
--   **kcat** can consume Avro-encoded messages using `-s avro -r <registry-url>` and provides rich JSON output with `-J`.
+- **Schema Registry** is the "single source of truth" for data structures.
+- **Evolution** allows schemas to change over time without breaking applications.
+- **Compatibility Modes** (BACKWARD, FORWARD, FULL) dictate the rules for evolution.
+- **kcat** can consume Avro-encoded messages using `-s avro -r <registry-url>` and provides rich JSON output with `-J`.
+
+
 
 ## Next Steps
 

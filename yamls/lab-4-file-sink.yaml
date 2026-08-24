@@ -1,0 +1,37 @@
+input:
+  kafka_franz_warpstream:
+    topics: ["transformed-events"]
+    consumer_group: "file-sink-pipeline"
+
+pipeline:
+  processors:
+    # Skip bootstrap / bad messages that lack partition fields
+    - mapping: |
+        root = if this.event_date.or("") == "" {
+          deleted()
+        } else {
+          this
+        }
+    - mapping: |
+        root = this
+        meta partition_path = "year=" + this.event_date.string().split("-").index(0) +
+                             "/month=" + this.event_date.string().split("-").index(1) +
+                             "/day=" + this.event_date.string().split("-").index(2) +
+                             "/hour=" + this.event_hour.string()
+
+buffer:
+  memory:
+    limit: 52428800
+    batch_policy:
+      enabled: true
+      count: 10
+      byte_size: 1048576
+      period: "10s"
+
+output:
+  file:
+    path: "./output/events/${! metadata(\"partition_path\") }/${! uuid_v4() }.json"
+    codec: lines
+
+warpstream:
+  cluster_concurrency_target: 1

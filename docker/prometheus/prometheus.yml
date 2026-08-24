@@ -5,6 +5,9 @@ global:
     cluster: 'warpstream-workshop'
     environment: 'local'
 
+rule_files:
+  - /etc/prometheus/alerts.yml
+
 scrape_configs:
   # WarpStream Hosted Prometheus Endpoint
   # Scrapes control plane metrics from WarpStream's hosted monitoring endpoint
