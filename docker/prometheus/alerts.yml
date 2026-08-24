@@ -1,0 +1,12 @@
+groups:
+  - name: warpstream_alerts
+    interval: 30s
+    rules:
+      - alert: HighConsumerLag
+        expr: warpstream_consumer_group_lag_seconds > 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High consumer lag detected"
+          description: "Consumer group {{ $labels.consumer_group }} has lag of {{ $value }}s"

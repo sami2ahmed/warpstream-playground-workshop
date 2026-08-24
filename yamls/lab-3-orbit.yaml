@@ -1,0 +1,30 @@
+#################final yaml for obit ################
+# WarpStream Orbit YAML configuration file.
+
+source_bootstrap_brokers:
+    - hostname: localhost
+      port: 9093
+
+# No SASL on the lab3 Kafka — omit username/password/mechanism.
+source_cluster_credentials:
+    use_tls: false
+    tls_insecure_skip_verify: false
+
+topic_mappings:
+    # Exact full-name match (regex), not substring.
+    - source_regex: orders
+      destination_prefix: ""
+      begin_fetch_at_latest_offset: false
+    - source_regex: payments
+      destination_prefix: ""
+      begin_fetch_at_latest_offset: false
+
+cluster_config:
+    copy_source_cluster_configuration: false
+
+consumer_groups:
+    destination_group_prefix: ""
+    copy_offsets_enabled: true
+
+warpstream:
+    cluster_fetch_concurrency: 2

@@ -3,6 +3,7 @@
 ## Learning Objectives
 
 By the end of this lab, you will:
+
 1. Create managed pipelines via the WarpStream Console
 2. Transform Kafka messages with key-value transformations (WarpStream to WarpStream)
 3. Write processed data to local files with date partitioning
@@ -12,7 +13,8 @@ By the end of this lab, you will:
 WarpStream Managed Data Pipelines uses **Bento** embedded directly in WarpStream Agents. This eliminates the need for separate Kafka Connect clusters or stream processing infrastructure.
 
 Pipelines are created and managed through:
-- **WarpStream Console**: Web UI at https://console.warpstream.com
+
+- **WarpStream Console**: Web UI at [https://console.warpstream.com](https://console.warpstream.com)
 - **WarpStream API**: Programmatic access via REST API
 
 ### Architecture
@@ -60,7 +62,7 @@ This pipeline transforms messages from `raw-events` to `transformed-events`.
 
 ### Step 1: Open WarpStream Console
 
-1. Go to https://console.warpstream.com
+1. Go to [https://console.warpstream.com](https://console.warpstream.com)
 2. Navigate to your cluster (e.g., `vcn_default`)
 3. Click the **Pipelines** tab
 4. Click **+ Create Pipeline**
@@ -77,7 +79,7 @@ Copy and paste this YAML into the pipeline editor:
 input:
   kafka_franz_warpstream:
     topics: ["raw-events"]
-    consumer_group: "transform-pipeline-v3"
+    consumer_group: "transform-pipeline"
 
 pipeline:
   processors:
@@ -114,12 +116,14 @@ warpstream:
 
 ### Key Transformations Explained
 
-| Transformation | Bloblang Example |
-|----------------|------------------|
-| Add timestamp | `root.processed_at = now()` |
+
+| Transformation    | Bloblang Example                                                 |
+| ----------------- | ---------------------------------------------------------------- |
+| Add timestamp     | `root.processed_at = now()`                                      |
 | Conditional logic | `root.priority = if this.amount > 500 { "high" } else { "low" }` |
-| Rename field | `root.customer_id = this.user_id` |
-| Drop PII | `root = this.without("ssn", "credit_card")` |
+| Rename field      | `root.customer_id = this.user_id`                                |
+| Drop PII          | `root = this.without("ssn", "credit_card")`                      |
+
 
 ---
 
@@ -148,7 +152,7 @@ Copy and paste this YAML:
 input:
   kafka_franz_warpstream:
     topics: ["transformed-events"]
-    consumer_group: "file-sink-pipeline-v3"
+    consumer_group: "file-sink-pipeline"
 
 pipeline:
   processors:
@@ -186,12 +190,14 @@ warpstream:
 
 **File Output Options** (from [Bento docs](https://warpstreamlabs.github.io/bento/docs/components/outputs/file/)):
 
-| Codec | Description |
-|-------|-------------|
-| `lines` | Append each message followed by a newline |
-| `all-bytes` | Write full message, overwrite existing file |
-| `append` | Append without delimiter |
-| `delim:x` | Append with custom delimiter (e.g., `delim:\t`) |
+
+| Codec       | Description                                     |
+| ----------- | ----------------------------------------------- |
+| `lines`     | Append each message followed by a newline       |
+| `all-bytes` | Write full message, overwrite existing file     |
+| `append`    | Append without delimiter                        |
+| `delim:x`   | Append with custom delimiter (e.g., `delim:\t`) |
+
 
 ### Step 4: Save and Enable
 
@@ -200,7 +206,20 @@ warpstream:
 
 ### Step 5: Spot-check transform output, then verify files
 
-After both pipelines are enabled, produce a few sample events (Part 5 below), then confirm the transform pipeline wrote enriched records to `transformed-events`:
+After both pipelines are enabled, produce a few (raw) sample events:
+
+```bash
+cat <<EOF | kcat -b localhost:9092 -t raw-events -P
+{"user_id": "user123", "amount": 150.50, "event_type": "purchase", "internal_id": "xyz", "ssn": "123-45-6789"}
+{"user_id": "user456", "amount": 75.00, "event_type": "purchase", "internal_id": "abc"}
+{"user_id": "user789", "amount": 600.00, "event_type": "purchase", "credit_card": "1234-5678-9012-3456"}
+{"user_id": "test-user", "amount": 25.00, "event_type": "test"}
+EOF
+```
+
+Wait ~10 seconds before checking output. The file sink's batch policy flushes on 10 messages *or* a 10 second period, and 4 events only trip the timer. Part 5 has a larger batch generator if you want to hit the count-based flush instead.
+
+Then confirm the transform pipeline wrote enriched records to `transformed-events`:
 
 ```bash
 kcat -b localhost:9092 -t transformed-events -C -o -5 -e
@@ -240,6 +259,7 @@ curl https://api.warpstream.com/api/v1/create_pipeline \
 ```
 
 Response:
+
 ```json
 {
   "pipeline_id": "pipeline-xyz",
@@ -279,7 +299,7 @@ curl https://api.warpstream.com/api/v1/change_pipeline_state \
 
 ## Part 5: Test the Pipelines
 
-### Produce Sample Events
+### Produce (raw) Sample Events 
 
 ```bash
 cat <<EOF | kcat -b localhost:9092 -t raw-events -P
@@ -321,6 +341,7 @@ kcat -b localhost:9092 -t raw-events -C -o -10 -c 10 | jq .
 ## Expected Transformation
 
 **Input (raw-events):**
+
 ```json
 {
   "user_id": "user123",
@@ -332,6 +353,7 @@ kcat -b localhost:9092 -t raw-events -C -o -10 -c 10 | jq .
 ```
 
 **Output (transformed-events):**
+
 ```json
 {
   "customer_id": "user123",

@@ -1,0 +1,31 @@
+input:
+  kafka_franz_warpstream:
+    topics: ["raw-events"]
+    consumer_group: "transform-pipeline"
+
+pipeline:
+  processors:
+    - mapping: |
+        root = this
+        root.processed_at = now()
+        root.event_date = now().ts_format("2006-01-02")
+        root.event_hour = now().ts_format("15")
+        root.is_high_value = this.amount.or(0) > 100
+        root.priority = if this.amount.or(0) > 500 {
+          "high"
+        } else if this.amount.or(0) > 100 {
+          "medium"
+        } else {
+          "low"
+        }
+        root.customer_id = this.user_id
+        root.transaction_amount = this.amount
+        root = root.without("user_id", "amount", "internal_id", "ssn", "credit_card")
+
+output:
+  kafka_franz_warpstream:
+    topic: "transformed-events"
+    key: "${! json(\"customer_id\") }"
+
+warpstream:
+  cluster_concurrency_target: 1
